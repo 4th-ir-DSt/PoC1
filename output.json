@@ -1,0 +1,35 @@
+{
+  "nodeId": "23",
+  "name": "Customer Excellence Reports",
+  "systemId": 4,
+  "systemName": "PowerBI",
+  "schemas": [
+    {
+      "tables": [
+        {
+          "tableName": "Customer Order Inventory",
+          "tableComments": "",
+          "columns": [
+            { "columnName": "Customer Identification", "columnDatatype": "" },
+            { "columnName": "Customer Full Name", "columnDatatype": "nchar" },
+            { "columnName": "Customer Address", "columnDatatype": "" },
+            { "columnName": "Customer Company Name", "columnDatatype": "" }
+          ]
+        },
+        {
+          "tableName": "Customer: Report",
+          "tableComments": "",
+          "columns": [
+            { "columnName": "Col1", "columnDatatype": "" },
+            { "columnName": "Col2", "columnDatatype": "" }
+          ]
+        },
+        {
+          "tableName": "Customer List",
+          "tableComments": "",
+          "columns": [{ "columnName": "Client Name", "columnDatatype": "" }]
+        }
+      ]
+    }
+  ]
+}
