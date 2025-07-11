@@ -1,10 +1,18 @@
 import asyncio
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from httpx import AsyncClient, HTTPStatusError
 from pydantic import BaseModel
+import json
 
 app = FastAPI()
 
+LMS_API_BASE = "https://language-model-service.mangobeach-c18b898d.switzerlandnorth.azurecontainerapps.io"
+
+
+class PushRequest(BaseModel):
+    env_id: str
+    store_name: str = "lms_store"
+    index_name: str = "QuestSoftware"
 
 class Column(BaseModel):
     columnName: str
@@ -58,22 +66,97 @@ async def get_tables(environment_id: str) -> Environment | None:
             response.raise_for_status()
             data = response.json()['data'][0]
 
-            output = Environment(
+            env = Environment(
                 nodeId=data['nodeId'],
                 name=data['name'],
                 systemId=data['systemId'],
                 systemName=data['systemName'],
                 schemas=data['schemas'],
             )
-            with open("output.json", "w") as f:
-                f.write(output.model_dump_json())
-            return output
+            print(env)
+            return env
     except HTTPStatusError as e:
         print(f"HTTP error occurred: {e.response.status_code} - {e.response.text}")
         return None
 
-print(len(environment_ids))
+
+async def push_table_to_lms(table: Table, environment: Environment, store_name: str, index_name: str) -> dict:
+    """Push a single table to the LMS."""
+    # Create payload with just the single table
+    table_data = {
+        "table": table.model_dump(),
+        "environment": {
+            "nodeId": environment.nodeId,
+            "name": environment.name,
+            "systemId": environment.systemId,
+            "systemName": environment.systemName
+        }
+    }
+
+    payload = [
+        {
+            "page_content": json.dumps(table_data),
+            "metadata": {
+                "index_name": index_name,
+                "metadata": {
+                    "systemName": environment.systemName,
+                    "environmentName": environment.name,
+                    "tableName": table.tableName,
+                    "tableComments": table.tableComments,
+                    "columnCount": len(table.columns)
+                }
+            }
+        }
+    ]
+
+    # Push payload to LMS API
+    lms_url = f"{LMS_API_BASE}/api/v1/vector-store/{store_name}/index/{index_name}/add"
+    async with AsyncClient(timeout=None) as client:
+        lms_response = await client.post(lms_url, json=payload)
+        lms_response.raise_for_status()
+        return {
+            "tableName": table.tableName,
+            "status": "success",
+            "columnCount": len(table.columns),
+            "lms_response": lms_response.json()
+        }
 
 
+@app.post("/push-to-lms/")
+async def push_to_lms(req: PushRequest):
+    
+    env_obj = await get_tables(req.env_id)
+    if not env_obj:
+        raise HTTPException(status_code=404, detail="Environment not found or fetch failed.")
 
-asyncio.run(get_tables("23")) 
+    all_tables = []
+    for schema in env_obj.schemas:
+        all_tables.extend(schema.tables)
+    
+    if not all_tables:
+        raise HTTPException(status_code=404, detail="No tables found in environment.")
+
+    results = []
+    for table in all_tables:
+        try:
+            result = await push_table_to_lms(table, env_obj, req.store_name, req.index_name)
+            results.append(result)
+            print(f"Successfully pushed table: {table.tableName}")
+        except Exception as e:
+            error_result = {
+                "tableName": table.tableName,
+                "status": "error",
+                "error": str(e)
+            }
+            results.append(error_result)
+            print(f"Failed to push table {table.tableName}: {e}")
+
+    return {
+        "message": f"Processed {len(all_tables)} tables from environment '{env_obj.name}'",
+        "environment": {
+            "name": env_obj.name,
+            "systemName": env_obj.systemName,
+            "totalTables": len(all_tables)
+        },
+        "results": results
+    }
