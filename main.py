@@ -81,35 +81,24 @@ async def get_tables(environment_id: str) -> Environment | None:
 
 
 async def push_table_to_lms(table: Table, environment: Environment, store_name: str, index_name: str) -> dict:
-    """Push a single table to the LMS."""
-    # Create payload with just the single table
-    table_data = {
-        "table": table.model_dump(),
-        "environment": {
-            "nodeId": environment.nodeId,
-            "name": environment.name,
-            "systemId": environment.systemId,
-            "systemName": environment.systemName
-        }
-    }
 
     payload = [
         {
-            "page_content": json.dumps(table_data),
+            "page_content": table.tableName,
             "metadata": {
                 "index_name": index_name,
                 "metadata": {
                     "systemName": environment.systemName,
                     "environmentName": environment.name,
-                    "tableName": table.tableName,
                     "tableComments": table.tableComments,
-                    "columnCount": len(table.columns)
+                    "columnCount": len(table.columns),
+                    "columnNames": [col.columnName for col in table.columns]
                 }
             }
         }
     ]
 
-    # Push payload to LMS API
+
     lms_url = f"{LMS_API_BASE}/api/v1/vector-store/{store_name}/index/{index_name}/add"
     async with AsyncClient(timeout=None) as client:
         lms_response = await client.post(lms_url, json=payload)
