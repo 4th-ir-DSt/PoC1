@@ -14,6 +14,7 @@ from core.prompts.main import SYSTEM_PROMPT
 from core.logging_config import get_logger
 from core.exceptions import LLMServiceException, ValidationException, StorageException
 import json
+from core.tools import handle_tool_call
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["Model Chat"])
@@ -98,9 +99,14 @@ async def model_chat(
         
         # Generate assistant response
         response = generate_logical_data(messages, request.query)
-        
-        # Post-process: ensure response is a JSON object if possible
-        processed_response = extract_json_from_string(response)
+        logger.info(f"Raw LLM response: {response}")
+        # Check for tool call and handle if present
+        tool_result = handle_tool_call(response)
+        if tool_result != response:
+            processed_response = tool_result
+        else:
+            # Post-process: ensure response is a JSON object if possible
+            processed_response = extract_json_from_string(response)
         
         # Add the assistant's response to the history
         assistant_message = {"role": "assistant", "content": processed_response, "timestamp": get_utc_timestamp()}
