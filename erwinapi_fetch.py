@@ -2,16 +2,13 @@ import asyncio
 from fastapi import FastAPI
 from httpx import AsyncClient, HTTPStatusError
 from pydantic import BaseModel
-import json
 
 app = FastAPI()
 
 
 class Column(BaseModel):
     columnName: str
-    columnDatatype: str | None = None
-    columnDefinition: str | None = None
-    columnComments: str | None = None
+    columnDatatype: str
 
 
 class Table(BaseModel):
@@ -68,33 +65,8 @@ async def get_tables(environment_id: str) -> Environment | None:
                 systemName=data['systemName'],
                 schemas=data['schemas'],
             )
-            # Write output with columns as list of dicts (name, datatype, definition, comments)
-            def serialize_column(col):
-                return {
-                    "name": col['columnName'],
-                    "datatype": col.get('columnDatatype'),
-                    "definition": col.get('columnDefinition'),
-                    "comments": col.get('columnComments')
-                }
-            def serialize_table(table):
-                return {
-                    "tableName": table['tableName'],
-                    "tableComments": table.get('tableComments'),
-                    "columns": [serialize_column(col) for col in table['columns']]
-                }
-            def serialize_schema(schema):
-                return {
-                    "tables": [serialize_table(table) for table in schema['tables']]
-                }
-            serialized = {
-                "nodeId": data['nodeId'],
-                "name": data['name'],
-                "systemId": data['systemId'],
-                "systemName": data['systemName'],
-                "schemas": [serialize_schema(schema) for schema in data['schemas']]
-            }
             with open("output.json", "w") as f:
-                f.write(json.dumps(serialized, indent=2))
+                f.write(output.model_dump_json())
             return output
     except HTTPStatusError as e:
         print(f"HTTP error occurred: {e.response.status_code} - {e.response.text}")
