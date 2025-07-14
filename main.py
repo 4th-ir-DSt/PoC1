@@ -16,7 +16,9 @@ class PushRequest(BaseModel):
 
 class Column(BaseModel):
     columnName: str
-    columnDatatype: str
+    columnDatatype: str | None = None
+    columnDefinition: str | None = None
+    columnComments: str | None = None
 
 
 class Table(BaseModel):
@@ -92,7 +94,14 @@ async def push_table_to_lms(table: Table, environment: Environment, store_name: 
                     "environmentName": environment.name,
                     "tableComments": table.tableComments,
                     "columnCount": len(table.columns),
-                    "columnNames": [col.columnName for col in table.columns]
+                    "columns": [
+                        {
+                            "name": col.columnName,
+                            "datatype": col.columnDatatype,
+                            "definition": col.columnDefinition,
+                            "comments": col.columnComments
+                        } for col in table.columns
+                    ]
                 }
             }
         }
